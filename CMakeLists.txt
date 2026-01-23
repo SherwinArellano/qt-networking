@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Networking VERSION 0.1 LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick)
@@ -16,6 +17,13 @@ qt_add_qml_module(appNetworking
     URI Networking
     QML_FILES
         Main.qml
+    SOURCES
+        src/ApiClient.h
+        src/ApiClient.cpp
+        src/HttpClient.h
+        src/HttpClient.cpp
+        src/ObjectApi.h
+        src/ObjectApi.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -31,6 +39,11 @@ set_target_properties(appNetworking PROPERTIES
 
 target_link_libraries(appNetworking
     PRIVATE Qt6::Quick
+)
+
+target_include_directories(appNetworking
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 include(GNUInstallDirs)
