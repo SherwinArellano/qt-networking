@@ -31,6 +31,8 @@ public:
 
     void get(const QString &id, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
 
+    void post(const QVariantMap& obj, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
+
 private:
     HttpClient* client = nullptr;
 };

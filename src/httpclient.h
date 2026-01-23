@@ -201,7 +201,7 @@ private:
     auto makeReplyHandler(RequestHandle* handle, Functor&& callback)
     {
         return [this, handle, cb = std::forward<Functor>(callback)](QRestReply& reply) mutable {
-            if (handle || handle->aborted()) return;
+            if (!handle || handle->aborted()) return;
 
             if (reply.isSuccess()) {
                 emit handle->finished(reply);

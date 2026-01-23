@@ -1,6 +1,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QJsonObject>
 #include <QDebug>
 #include "src/ApiClient.h"
 #include "src/HttpClient.h"
@@ -35,6 +36,16 @@ int main(int argc, char *argv[])
 
     objectApi.get("7", [](const QVariantMap &object) {
         qDebug() << "Objects loaded from source:" << object["name"].toString();
+    }, [](const ErrorResult &er) {
+        qDebug() << "[ERR] Object not loaded:" << er.status << er.message;
+    });
+
+    QVariantMap obj;
+    obj["name"] = "Sample Item";
+    objectApi.post(obj, [](const QVariantMap &object) {
+        const QJsonDocument doc(QJsonObject::fromVariantMap(object));
+        qDebug() << "Objects loaded from source:";
+        qDebug() << doc.toJson();
     }, [](const ErrorResult &er) {
         qDebug() << "[ERR] Object not loaded:" << er.status << er.message;
     });
