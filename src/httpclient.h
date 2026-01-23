@@ -28,9 +28,16 @@ struct RetryPolicy {
 
 class RequestHandle : public QObject {
     Q_OBJECT
+
 public:
     explicit RequestHandle(QObject* parent = nullptr) : QObject(parent) {}
-    Q_INVOKABLE void abort() { m_aborted = true; }
+
+    Q_INVOKABLE void abort() {
+        if (m_aborted) return;
+        m_aborted = true;
+        deleteLater();
+    }
+
     bool aborted() const { return m_aborted; }
 
 signals:
@@ -46,6 +53,10 @@ private:
 class HttpClient : public QObject
 {
     Q_OBJECT
+
+public:
+signals:
+    void networkError(QString message, int httpStatus);
 
 public:
     explicit HttpClient(const QUrl& baseUrl = {}, QObject *parent = nullptr);
@@ -72,6 +83,7 @@ public:
     RequestHandle* get(const QString& urlOrPath, Functor&& callback, RetryPolicy policy)
     {
         auto* handle = new RequestHandle(this);
+        autoDeleteHandle(handle);
 
         auto doAttempt = [
             this,
@@ -93,7 +105,7 @@ public:
             qDebug() << QStringLiteral("[NETWORK] Fetch (%1): %2").arg(attemptNo).arg(req.url().toString()).toStdString();
 
             m_rest.get(req, handle, [this, handle, cb, policy, attemptNo, self](QRestReply &reply) mutable {
-               if (handle->aborted()) return;
+               if (!handle || handle->aborted()) return;
 
                if (reply.isSuccess()) {
                    emit handle->finished(reply);
@@ -111,7 +123,7 @@ public:
 
                const int delay = retryDelayMs(policy, attemptNo);
                QTimer::singleShot(delay, handle, [handle, self, attemptNo]() mutable {
-                   if (handle->aborted()) return;
+                   if (!handle || handle->aborted()) return;
                    self(self, attemptNo + 1);
                });
             });
@@ -121,13 +133,92 @@ public:
         return handle;
     }
 
-signals:
-    void networkError(QString message, int httpStatus);
+    template<typename Functor>
+    requires std::invocable<Functor, QRestReply&>
+    RequestHandle* post(const QString& urlOrPath, const QByteArray& data, Functor&& callback)
+    {
+        auto* handle = new RequestHandle(this);
+        autoDeleteHandle(handle);
+        emit handle->attempt(1);
+
+        const QNetworkRequest req = buildRequest(urlOrPath);
+        if (!req.url().isValid()) {
+            emit handle->failed("Invalid URL", 0);
+            return handle;
+        }
+
+        qDebug() << QStringLiteral("[NETWORK] POST: %1").arg(req.url().toString()).toStdString();
+
+        m_rest.post(req, data, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
+        return handle;
+    }
+
+    template<typename Functor>
+    requires std::invocable<Functor, QRestReply&>
+    RequestHandle* put(const QString& urlOrPath, const QByteArray& data, Functor&& callback)
+    {
+        auto* handle = new RequestHandle(this);
+        autoDeleteHandle(handle);
+        emit handle->attempt(1);
+
+        const QNetworkRequest req = buildRequest(urlOrPath);
+        if (!req.url().isValid()) {
+            emit handle->failed("Invalid URL", 0);
+            return handle;
+        }
+
+        qDebug() << QStringLiteral("[NETWORK] PUT: %1").arg(req.url().toString()).toStdString();
+
+        m_rest.put(req, data, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
+        return handle;
+    }
+
+    template<typename Functor>
+    requires std::invocable<Functor, QRestReply&>
+    RequestHandle* remove(const QString& urlOrPath, Functor&& callback)
+    {
+        auto* handle = new RequestHandle(this);
+        autoDeleteHandle(handle);
+        emit handle->attempt(1);
+
+        const QNetworkRequest req = buildRequest(urlOrPath);
+        if (!req.url().isValid()) {
+            emit handle->failed("Invalid URL", 0);
+            return handle;
+        }
+
+        qDebug() << QStringLiteral("[NETWORK] DELETE: %1").arg(req.url().toString()).toStdString();
+
+        m_rest.deleteResource(req, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
+        return handle;
+    }
 
 private:
     QNetworkRequest buildRequest(const QString& urlOrPath) const;
 
+    template<typename Functor>
+    requires std::invocable<Functor, QRestReply&>
+    auto makeReplyHandler(RequestHandle* handle, Functor&& callback)
+    {
+        return [this, handle, cb = std::forward<Functor>(callback)](QRestReply& reply) mutable {
+            if (handle || handle->aborted()) return;
+
+            if (reply.isSuccess()) {
+                emit handle->finished(reply);
+                cb(reply);
+                return;
+            }
+
+            emit networkError(reply.errorString(), reply.httpStatus());
+            emit handle->failed(reply.errorString(), reply.httpStatus());
+            cb(reply); // invoke callback on failure
+        };
+    }
+
     static int retryDelayMs(const RetryPolicy& policy, int attemptNo);
+
+    static void autoDeleteHandle(RequestHandle* h);
+
     bool shouldRetry(const QRestReply& reply, const RetryPolicy& policy, int attemptNo) const;
 
 private:

@@ -7,69 +7,33 @@
 #include <QRestReply>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <concepts>
-#include <utility>
+#include <QPointer>
+#include <functional>
 
 #include "HttpClient.h"
 
 struct ErrorResult {
-    int status;
+    int status = 0;
     QString message;
-    QNetworkReply *reply;
+    QPointer<QNetworkReply> reply;
 };
-
-template <typename Cb>
-concept ErrorCbType = std::invocable<Cb, const ErrorResult &>;
 
 class ObjectApi : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit ObjectApi(HttpClient *client, QObject *parent = nullptr);
+    using ErrorCb = std::function<void(const ErrorResult&)>;
 
-    template <typename SuccessCb, ErrorCbType ErrorCb>
-    requires std::invocable<SuccessCb, const QVariantList &>
-    void getMany(SuccessCb &&successCb, ErrorCb &&errorCb)
-    {
-        if (!client) {
-            ErrorResult er{0, "HttpClient is null", nullptr};
-            std::forward<ErrorCb>(errorCb)(er);
-            return;
-        }
+    explicit ObjectApi(HttpClient* client, QObject* parent = nullptr);
 
-        client->get("objects", [
-            success = std::forward<SuccessCb>(successCb),
-            error = std::forward<ErrorCb>(errorCb)
-        ](QRestReply &reply) mutable -> void {
-            ErrorResult er{
-                reply.httpStatus(),
-                reply.errorString(),
-                reply.networkReply()
-            };
+    void getMany(std::function<void(const QVariantList&)> successCb, ErrorCb errorCb);
 
-            if (!reply.isSuccess()) {
-                error(er);
-                return;
-            }
-
-            auto doc = reply.readJson();
-            if (!doc) {
-                er.message = "Invalid JSON response";
-                error(er);
-                return;
-            }
-
-            if (doc->isArray()) {
-                success(doc->array().toVariantList());
-            } else {
-                er.message = "Unexpected JSON type";
-                error(er);
-            }
-        });
-    }
+    void get(const QString &id, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
 
 private:
-    HttpClient *client;
+    HttpClient* client = nullptr;
 };
+
 
 #endif // OBJECTAPI_H

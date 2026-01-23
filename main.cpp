@@ -27,10 +27,16 @@ int main(int argc, char *argv[])
     HttpClient httpClient{QUrl("https://api.restful-api.dev")};
     ObjectApi objectApi{&httpClient};
 
-    objectApi.getMany([](const QVariantList& objects) {
+    objectApi.getMany([](const QVariantList &objects) {
         qDebug() << "Objects loaded from source:" << objects.length();
-    }, [](const ErrorResult& er) {
+    }, [](const ErrorResult &er) {
         qDebug() << "[ERR] Objects not loaded:" << er.status << er.message;
+    });
+
+    objectApi.get("7", [](const QVariantMap &object) {
+        qDebug() << "Objects loaded from source:" << object["name"].toString();
+    }, [](const ErrorResult &er) {
+        qDebug() << "[ERR] Object not loaded:" << er.status << er.message;
     });
 
     return app.exec();

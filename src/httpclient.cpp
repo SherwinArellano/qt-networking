@@ -61,6 +61,12 @@ int HttpClient::retryDelayMs(const RetryPolicy& policy, int attemptNo)
     return qBound(0, ms, policy.maxDelayMs);
 }
 
+void HttpClient::autoDeleteHandle(RequestHandle *handle)
+{
+    QObject::connect(handle, &RequestHandle::finished, handle, &QObject::deleteLater);
+    QObject::connect(handle, &RequestHandle::failed,   handle, &QObject::deleteLater);
+}
+
 bool HttpClient::shouldRetry(const QRestReply& reply, const RetryPolicy& policy, int attemptNo) const
 {
     if (attemptNo >= policy.maxAttempts)
