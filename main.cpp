@@ -19,7 +19,6 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
-
     ApiClient api;
     engine.rootContext()->setContextProperty("api", &api);
 

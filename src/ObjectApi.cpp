@@ -1,124 +1,49 @@
 #include "ObjectApi.h"
-#include <QRestReply>
 #include <QJsonDocument>
-#include <QJsonArray>
 #include <QJsonObject>
-
-ObjectApi::ObjectApi(HttpClient *client, QObject *parent)
-    : client{client}, QObject{parent}
-{}
 
 void ObjectApi::getMany(std::function<void(const QVariantList&)> successCb, ErrorCb errorCb)
 {
-    if (!client) {
-        if (errorCb) errorCb(ErrorResult{0, "HttpClient is null", nullptr});
-        return;
-    }
+    if (!ensureClient(errorCb)) return;
 
-    client->get("objects", [
+    client()->get("objects", [
         successCb = std::move(successCb),
         errorCb = std::move(errorCb)
     ](QRestReply& reply) mutable {
-        if (!reply.isSuccess()) {
-            if (errorCb) {
-                errorCb(ErrorResult{
-                    reply.httpStatus(),
-                    reply.errorString(),
-                    reply.networkReply()
-                });
-            }
-            return;
-        }
 
-        auto doc = reply.readJson();
-        if (!doc || !doc->isArray()) {
-            if (errorCb) {
-                errorCb(ErrorResult{
-                    reply.httpStatus(),
-                    doc ? "Unexpected JSON type" : "Invalid JSON response",
-                    reply.networkReply()
-                });
-            }
-            return;
-        }
-
-        if (successCb) successCb(doc->array().toVariantList());
+        expectArray(reply, errorCb, [&](const QJsonArray& arr) {
+            if (successCb) successCb(arr.toVariantList());
+        });
     });
 }
 
-void ObjectApi::get(const QString &id, std::function<void (const QVariantMap &)> successCb, ErrorCb errorCb)
+void ObjectApi::get(const QString& id, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb)
 {
-    if (!client) {
-        if (errorCb) errorCb(ErrorResult{0, "HttpClient is null", nullptr});
-        return;
-    }
+    if (!ensureClient(errorCb)) return;
 
-    client->get("objects/" + id, [
+    client()->get("objects/" + id, [
         successCb = std::move(successCb),
         errorCb = std::move(errorCb)
     ](QRestReply& reply) mutable {
-        if (!reply.isSuccess()) {
-            if (errorCb) {
-                errorCb(ErrorResult{
-                    reply.httpStatus(),
-                    reply.errorString(),
-                    reply.networkReply()
-                });
-            }
-            return;
-        }
-
-        auto doc = reply.readJson();
-        if (!doc || !doc->isObject()) {
-            if (errorCb) {
-                errorCb(ErrorResult{
-                    reply.httpStatus(),
-                    doc ? "Unexpected JSON type" : "Invalid JSON response",
-                    reply.networkReply()
-                });
-            }
-            return;
-        }
-
-        if (successCb) successCb(doc->object().toVariantMap());
+        expectObject(reply, errorCb, [&](const QJsonObject& obj) {
+            if (successCb) successCb(obj.toVariantMap());
+        });
     });
 }
 
-void ObjectApi::post(const QVariantMap &obj, std::function<void (const QVariantMap &)> successCb, ErrorCb errorCb)
+void ObjectApi::post(const QVariantMap& obj, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb)
 {
-    if (!client) {
-        if (errorCb) errorCb(ErrorResult{0, "HttpClient is null", nullptr});
-        return;
-    }
+    if (!ensureClient(errorCb)) return;
 
-    const QJsonDocument doc(QJsonObject::fromVariantMap(obj));
-    client->post("objects", doc.toJson(), [
+    const QJsonDocument body(QJsonObject::fromVariantMap(obj));
+
+    client()->post("objects", body.toJson(), [
         successCb = std::move(successCb),
-        errorCb = std::move(errorCb)
+        errorCb   = std::move(errorCb)
     ](QRestReply& reply) mutable {
-        if (!reply.isSuccess()) {
-            if (errorCb) {
-                errorCb(ErrorResult{
-                    reply.httpStatus(),
-                    reply.errorString(),
-                    reply.networkReply()
-                });
-            }
-            return;
-        }
 
-        auto doc = reply.readJson();
-        if (!doc || !doc->isObject()) {
-            if (errorCb) {
-                errorCb(ErrorResult{
-                    reply.httpStatus(),
-                    doc ? "Unexpected JSON type" : "Invalid JSON response",
-                    reply.networkReply()
-                });
-            }
-            return;
-        }
-
-        if (successCb) successCb(doc->object().toVariantMap());
+        expectObject(reply, errorCb, [&](const QJsonObject& obj) {
+            if (successCb) successCb(obj.toVariantMap());
+        });
     });
 }

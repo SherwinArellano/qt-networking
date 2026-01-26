@@ -22,6 +22,8 @@ qt_add_qml_module(appNetworking
         src/ApiClient.cpp
         src/HttpClient.h
         src/HttpClient.cpp
+        src/ApiTypes.h
+        src/BaseApi.h
         src/ObjectApi.h
         src/ObjectApi.cpp
 )
