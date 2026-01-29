@@ -18,6 +18,9 @@ public:
     void getMany(std::function<void(const QVariantList&)> successCb, ErrorCb errorCb);
     void get(const QString& id, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
     void post(const QVariantMap& obj, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
+    void put(const QString& id, const QVariantMap& obj, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
+    void patch(const QString& id, const QVariantMap& obj, std::function<void(const QVariantMap&)> successCb, ErrorCb errorCb);
+    void remove(const QString& id, std::function<void(bool)> successCb, ErrorCb errorCb);
 };
 
 #endif // OBJECTAPI_H

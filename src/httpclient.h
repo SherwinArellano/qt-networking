@@ -102,30 +102,30 @@ public:
                 return;
             }
 
-            qDebug() << QStringLiteral("[NETWORK] Fetch (%1): %2").arg(attemptNo).arg(req.url().toString()).toStdString();
+            qDebug().noquote() << QStringLiteral("[NETWORK] Fetch (%1): %2").arg(attemptNo).arg(req.url().toString()).toStdString();
 
             m_rest.get(req, handle, [this, handle, cb, policy, attemptNo, self](QRestReply &reply) mutable {
-               if (!handle || handle->aborted()) return;
+                if (!handle || handle->aborted()) return;
 
-               if (reply.isSuccess()) {
-                   emit handle->finished(reply);
-                   cb(reply);
-                   return;
-               }
+                if (reply.isSuccess()) {
+                    emit handle->finished(reply);
+                    cb(reply);
+                    return;
+                }
 
-               const bool willRetry = shouldRetry(reply, policy, attemptNo);
-               if (!willRetry) {
-                   emit networkError(reply.errorString(), reply.httpStatus());
-                   emit handle->failed(reply.errorString(), reply.httpStatus());
-                   cb(reply); // invoke callback on failure
-                   return;
-               }
+                const bool willRetry = shouldRetry(reply, policy, attemptNo);
+                if (!willRetry) {
+                    emit networkError(reply.errorString(), reply.httpStatus());
+                    emit handle->failed(reply.errorString(), reply.httpStatus());
+                    cb(reply); // invoke callback on failure
+                    return;
+                }
 
-               const int delay = retryDelayMs(policy, attemptNo);
-               QTimer::singleShot(delay, handle, [handle, self, attemptNo]() mutable {
-                   if (!handle || handle->aborted()) return;
-                   self(self, attemptNo + 1);
-               });
+                const int delay = retryDelayMs(policy, attemptNo);
+                QTimer::singleShot(delay, handle, [handle, self, attemptNo]() mutable {
+                    if (!handle || handle->aborted()) return;
+                    self(self, attemptNo + 1);
+                });
             });
         };
 
@@ -147,7 +147,7 @@ public:
             return handle;
         }
 
-        qDebug() << QStringLiteral("[NETWORK] POST: %1").arg(req.url().toString()).toStdString();
+        qDebug().noquote() << QStringLiteral("[NETWORK] POST: %1").arg(req.url().toString()).toStdString();
 
         m_rest.post(req, data, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
         return handle;
@@ -167,9 +167,29 @@ public:
             return handle;
         }
 
-        qDebug() << QStringLiteral("[NETWORK] PUT: %1").arg(req.url().toString()).toStdString();
+        qDebug().noquote() << QStringLiteral("[NETWORK] PUT: %1").arg(req.url().toString()).toStdString();
 
         m_rest.put(req, data, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
+        return handle;
+    }
+
+    template<typename Functor>
+    requires std::invocable<Functor, QRestReply&>
+    RequestHandle* patch(const QString& urlOrPath, const QByteArray& data, Functor&& callback)
+    {
+        auto* handle = new RequestHandle(this);
+        autoDeleteHandle(handle);
+        emit handle->attempt(1);
+
+        const QNetworkRequest req = buildRequest(urlOrPath);
+        if (!req.url().isValid()) {
+            emit handle->failed("Invalid URL", 0);
+            return handle;
+        }
+
+        qDebug().noquote() << QStringLiteral("[NETWORK] PATCH: %1").arg(req.url().toString()).toStdString();
+
+        m_rest.patch(req, data, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
         return handle;
     }
 
@@ -187,7 +207,7 @@ public:
             return handle;
         }
 
-        qDebug() << QStringLiteral("[NETWORK] DELETE: %1").arg(req.url().toString()).toStdString();
+        qDebug().noquote() << QStringLiteral("[NETWORK] DELETE: %1").arg(req.url().toString()).toStdString();
 
         m_rest.deleteResource(req, handle, makeReplyHandler(handle, std::forward<Functor>(callback)));
         return handle;
